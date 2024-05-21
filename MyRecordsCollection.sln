@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34701.34
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyRecordCollection.Android", "MyRecordCollection.Android\MyRecordCollection.Android.csproj", "{E5BEF1ED-FC71-43B0-A975-9654CF8D10CF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyRecordsCollection.Android", "MyRecordCollection.Android\MyRecordsCollection.Android.csproj", "{E5BEF1ED-FC71-43B0-A975-9654CF8D10CF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyRecordCollection", "MyRecordCollection\MyRecordCollection.csproj", "{373024F5-6A4E-4ECD-8B6E-231CB82F006A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MyRecordsCollection", "MyRecordCollection\MyRecordsCollection.csproj", "{373024F5-6A4E-4ECD-8B6E-231CB82F006A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -88,10 +88,10 @@
     <Folder Include="Resources\drawable\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MyRecordCollection\MyRecordCollection.csproj">
-      <Project>{ECBE61BC-D701-4E61-BB00-71E190D1B004}</Project>
-      <Name>MyRecordCollection</Name>
+    <ProjectReference Include="..\MyRecordCollection\MyRecordsCollection.csproj">
+      <Project>{373024F5-6A4E-4ECD-8B6E-231CB82F006A}</Project>
+      <Name>MyRecordsCollection</Name>
     </ProjectReference>
   </ItemGroup>
- <Import Project="$(MSBuildExtensionsPath)\Xamarin\Android\Xamarin.Android.CSharp.targets" />
+  <Import Project="$(MSBuildExtensionsPath)\Xamarin\Android\Xamarin.Android.CSharp.targets" />
 </Project>
