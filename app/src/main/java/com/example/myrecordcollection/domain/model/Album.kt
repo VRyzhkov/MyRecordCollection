@@ -1,0 +1,8 @@
+package com.example.myrecordcollection.domain.model
+
+data class Album(
+    val id: String,
+    val title: String,
+    val artists: List<Artist>,
+    val coverUrl: String? = null,
+)
