@@ -9,6 +9,8 @@ sealed interface CollectionUiState {
 
     data class Content(
         val groups: List<ArtistGroup>,
+        val isRefreshing: Boolean = false,
+        val refreshError: String? = null,
     ) : CollectionUiState
 
     data class Error(

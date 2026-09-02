@@ -5,4 +5,5 @@ data class Album(
     val title: String,
     val artists: List<Artist>,
     val coverUrl: String? = null,
+    val localCoverPath: String? = null,
 )

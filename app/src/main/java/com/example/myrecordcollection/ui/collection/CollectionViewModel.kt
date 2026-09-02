@@ -1,45 +1,73 @@
 package com.example.myrecordcollection.ui.collection
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.myrecordcollection.data.music.FakeMusicRepository
-import com.example.myrecordcollection.domain.usecase.LoadAlbumGroupsUseCase
+import com.example.myrecordcollection.app.MyRecordCollectionApp
+import com.example.myrecordcollection.data.music.MusicRepository
+import com.example.myrecordcollection.domain.model.ArtistGroup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class CollectionViewModel(
-    private val loadAlbumGroups: LoadAlbumGroupsUseCase = LoadAlbumGroupsUseCase(
-        musicRepository = FakeMusicRepository(),
-    ),
-) : ViewModel() {
+class CollectionViewModel(application: Application) : AndroidViewModel(application) {
+    private val musicRepository: MusicRepository =
+        (application as MyRecordCollectionApp).musicRepository
+
     private val _uiState = MutableStateFlow<CollectionUiState>(CollectionUiState.Loading)
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
 
+    private var groups: List<ArtistGroup> = emptyList()
+    private var isRefreshing = true
+
     init {
-        loadCollection()
+        observeCollection()
+        refreshCollection()
     }
 
     fun loadCollection() {
-        viewModelScope.launch {
-            _uiState.value = CollectionUiState.Loading
+        if (isRefreshing) return
+        isRefreshing = true
+        publishState()
+        refreshCollection()
+    }
 
+    private fun observeCollection() {
+        viewModelScope.launch {
+            musicRepository.observeAlbumGroups().collect { storedGroups ->
+                groups = storedGroups
+                publishState()
+            }
+        }
+    }
+
+    private fun refreshCollection() {
+        viewModelScope.launch {
             try {
-                val groups = loadAlbumGroups()
-                _uiState.value = if (groups.isEmpty()) {
-                    CollectionUiState.Empty
-                } else {
-                    CollectionUiState.Content(groups)
-                }
+                musicRepository.refreshCollection()
+                isRefreshing = false
+                publishState()
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                _uiState.value = CollectionUiState.Error(
-                    message = error.message ?: "Не удалось загрузить коллекцию",
-                )
+                isRefreshing = false
+                val message = error.message ?: "Не удалось обновить коллекцию"
+                _uiState.value = if (groups.isEmpty()) {
+                    CollectionUiState.Error(message)
+                } else {
+                    CollectionUiState.Content(groups, refreshError = message)
+                }
             }
+        }
+    }
+
+    private fun publishState() {
+        _uiState.value = when {
+            groups.isNotEmpty() -> CollectionUiState.Content(groups, isRefreshing)
+            isRefreshing -> CollectionUiState.Loading
+            else -> CollectionUiState.Empty
         }
     }
 }
