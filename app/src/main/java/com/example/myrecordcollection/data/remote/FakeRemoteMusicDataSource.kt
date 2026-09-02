@@ -3,8 +3,8 @@ package com.example.myrecordcollection.data.remote
 import com.example.myrecordcollection.domain.model.Album
 import com.example.myrecordcollection.domain.model.Artist
 
-class FakeRemoteMusicDataSource {
-    suspend fun getFavoriteAlbums(): List<Album> {
+class FakeRemoteMusicDataSource : MusicRemoteDataSource {
+    override suspend fun getFavoriteAlbums(): List<Album> {
         val pinkFloyd = Artist(id = "artist-pink-floyd", name = "Pink Floyd")
         val queen = Artist(id = "artist-queen", name = "Queen")
         val daftPunk = Artist(id = "artist-daft-punk", name = "Daft Punk")

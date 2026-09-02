@@ -246,7 +246,7 @@ private fun SignInContent(
             Text("Сохранить токен")
         }
         Text(
-            text = "Проверка токена и загрузка реальной коллекции будут подключены сетевым адаптером.",
+            text = "Используется неофициальный API Яндекс Музыки; его контракт может измениться.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

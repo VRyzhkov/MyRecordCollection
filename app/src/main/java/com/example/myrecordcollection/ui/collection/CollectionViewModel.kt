@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.myrecordcollection.app.MyRecordCollectionApp
 import com.example.myrecordcollection.data.music.MusicRepository
 import com.example.myrecordcollection.domain.model.ArtistGroup
+import com.example.myrecordcollection.data.remote.InvalidMusicTokenException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -102,6 +103,13 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
                 publishState()
             } catch (error: CancellationException) {
                 throw error
+            } catch (error: InvalidMusicTokenException) {
+                tokenStorage.clear()
+                collectionEnabled = false
+                collectionJob?.cancel()
+                groups = emptyList()
+                isRefreshing = false
+                _uiState.value = CollectionUiState.SignedOut(error.message)
             } catch (error: Exception) {
                 isRefreshing = false
                 val message = error.message ?: "Не удалось обновить коллекцию"

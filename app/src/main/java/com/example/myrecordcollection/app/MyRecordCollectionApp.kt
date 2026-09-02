@@ -9,6 +9,8 @@ import com.example.myrecordcollection.data.local.MusicDatabase
 import com.example.myrecordcollection.data.music.MusicRepository
 import com.example.myrecordcollection.data.music.OfflineMusicRepository
 import com.example.myrecordcollection.data.remote.FakeRemoteMusicDataSource
+import com.example.myrecordcollection.data.remote.SelectedMusicRemoteDataSource
+import com.example.myrecordcollection.data.remote.YandexMusicRemoteDataSource
 
 class MyRecordCollectionApp : Application() {
     val tokenStorage: TokenStorage by lazy { EncryptedTokenStorage(applicationContext) }
@@ -22,7 +24,11 @@ class MyRecordCollectionApp : Application() {
         OfflineMusicRepository(
             musicDao = database.musicDao(),
             coverStorage = AlbumCoverStorage(applicationContext),
-            remoteDataSource = FakeRemoteMusicDataSource(),
+            remoteDataSource = SelectedMusicRemoteDataSource(
+                context = applicationContext,
+                demo = FakeRemoteMusicDataSource(),
+                yandex = YandexMusicRemoteDataSource(tokenStorage),
+            ),
         )
     }
 }

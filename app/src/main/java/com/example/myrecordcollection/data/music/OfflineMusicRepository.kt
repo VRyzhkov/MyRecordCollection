@@ -5,7 +5,7 @@ import com.example.myrecordcollection.data.local.MusicDao
 import com.example.myrecordcollection.data.local.entity.AlbumArtistCrossRef
 import com.example.myrecordcollection.data.local.entity.AlbumEntity
 import com.example.myrecordcollection.data.local.entity.ArtistEntity
-import com.example.myrecordcollection.data.remote.FakeRemoteMusicDataSource
+import com.example.myrecordcollection.data.remote.MusicRemoteDataSource
 import com.example.myrecordcollection.domain.model.Album
 import com.example.myrecordcollection.domain.model.Artist
 import com.example.myrecordcollection.domain.model.ArtistGroup
@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.map
 class OfflineMusicRepository(
     private val musicDao: MusicDao,
     private val coverStorage: AlbumCoverStorage,
-    private val remoteDataSource: FakeRemoteMusicDataSource,
+    private val remoteDataSource: MusicRemoteDataSource,
 ) : MusicRepository {
     override fun observeAlbumGroups(): Flow<List<ArtistGroup>> =
         musicDao.observeAlbums().map { rows ->
