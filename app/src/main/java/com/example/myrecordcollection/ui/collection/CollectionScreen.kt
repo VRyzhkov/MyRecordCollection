@@ -25,9 +25,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -66,6 +69,9 @@ fun CollectionRoute(
         uiState = uiState,
         onRetry = viewModel::loadCollection,
         onRefresh = viewModel::loadCollection,
+        onConnect = viewModel::connectWithToken,
+        onContinueInDemo = viewModel::continueInDemoMode,
+        onSignOut = viewModel::signOut,
         themeMode = themeMode,
         onThemeModeChanged = onThemeModeChanged,
         modifier = modifier,
@@ -77,6 +83,9 @@ fun CollectionScreen(
     uiState: CollectionUiState,
     onRetry: () -> Unit,
     onRefresh: () -> Unit = onRetry,
+    onConnect: (String) -> Unit = {},
+    onContinueInDemo: () -> Unit = {},
+    onSignOut: () -> Unit = {},
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChanged: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -97,7 +106,13 @@ fun CollectionScreen(
                 .navigationBarsPadding(),
         ) {
             when (uiState) {
+                CollectionUiState.CheckingAuth -> LoadingContent()
                 CollectionUiState.Loading -> LoadingContent()
+                is CollectionUiState.SignedOut -> SignInContent(
+                    message = uiState.message,
+                    onConnect = onConnect,
+                    onContinueInDemo = onContinueInDemo,
+                )
                 CollectionUiState.Empty -> EmptyContent()
                 is CollectionUiState.Error -> ErrorContent(
                     message = uiState.message,
@@ -111,6 +126,9 @@ fun CollectionScreen(
             SettingsMenu(
                 themeMode = themeMode,
                 onThemeModeChanged = onThemeModeChanged,
+                collectionActionsEnabled = uiState is CollectionUiState.Content,
+                onRefresh = onRefresh,
+                onSignOut = onSignOut,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
         }
@@ -121,6 +139,9 @@ fun CollectionScreen(
 private fun SettingsMenu(
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
+    collectionActionsEnabled: Boolean,
+    onRefresh: () -> Unit,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -136,6 +157,22 @@ private fun SettingsMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            if (collectionActionsEnabled) {
+                DropdownMenuItem(
+                    text = { Text("Обновить коллекцию") },
+                    onClick = {
+                        onRefresh()
+                        expanded = false
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Отключить аккаунт") },
+                    onClick = {
+                        onSignOut()
+                        expanded = false
+                    },
+                )
+            }
             Text(
                 text = "Тема оформления",
                 style = MaterialTheme.typography.labelLarge,
@@ -156,6 +193,67 @@ private fun SettingsMenu(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SignInContent(
+    message: String?,
+    onConnect: (String) -> Unit,
+    onContinueInDemo: () -> Unit,
+) {
+    var token by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Подключение Яндекс Музыки",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Токен будет зашифрован ключом Android Keystore и останется только на устройстве.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        OutlinedTextField(
+            value = token,
+            onValueChange = { token = it },
+            label = { Text("Access token") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        message?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(it, color = MaterialTheme.colorScheme.error)
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = { onConnect(token) },
+            enabled = token.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Сохранить токен")
+        }
+        Text(
+            text = "Проверка токена и загрузка реальной коллекции будут подключены сетевым адаптером.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        TextButton(onClick = onContinueInDemo) {
+            Text("Продолжить с тестовой коллекцией")
         }
     }
 }
