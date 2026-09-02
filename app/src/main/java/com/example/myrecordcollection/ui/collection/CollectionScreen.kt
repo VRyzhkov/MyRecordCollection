@@ -1,5 +1,12 @@
 package com.example.myrecordcollection.ui.collection
 
+import android.content.Intent
+import android.content.res.Configuration
+import android.net.Uri
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,8 +20,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -26,19 +37,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myrecordcollection.domain.model.Album
 import com.example.myrecordcollection.domain.model.Artist
 import com.example.myrecordcollection.domain.model.ArtistGroup
 import com.example.myrecordcollection.ui.theme.MyRecordCollectionTheme
+import com.example.myrecordcollection.ui.theme.ThemeMode
 
 @Composable
 fun CollectionRoute(
+    themeMode: ThemeMode,
+    onThemeModeChanged: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CollectionViewModel = viewModel(),
 ) {
@@ -48,6 +66,8 @@ fun CollectionRoute(
         uiState = uiState,
         onRetry = viewModel::loadCollection,
         onRefresh = viewModel::loadCollection,
+        themeMode = themeMode,
+        onThemeModeChanged = onThemeModeChanged,
         modifier = modifier,
     )
 }
@@ -57,6 +77,8 @@ fun CollectionScreen(
     uiState: CollectionUiState,
     onRetry: () -> Unit,
     onRefresh: () -> Unit = onRetry,
+    themeMode: ThemeMode = ThemeMode.System,
+    onThemeModeChanged: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Surface(modifier = modifier.fillMaxSize()) {
@@ -84,6 +106,54 @@ fun CollectionScreen(
                 is CollectionUiState.Content -> CollectionContent(
                     state = uiState,
                     onRefresh = onRefresh,
+                )
+            }
+            SettingsMenu(
+                themeMode = themeMode,
+                onThemeModeChanged = onThemeModeChanged,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsMenu(
+    themeMode: ThemeMode,
+    onThemeModeChanged: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        IconButton(
+            onClick = { expanded = true },
+            modifier = Modifier.semantics { contentDescription = "Настройки" },
+        ) {
+            Text(text = "⋮", style = MaterialTheme.typography.headlineMedium)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            Text(
+                text = "Тема оформления",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            ThemeMode.entries.forEach { mode ->
+                DropdownMenuItem(
+                    text = { Text(mode.title) },
+                    leadingIcon = {
+                        RadioButton(
+                            selected = themeMode == mode,
+                            onClick = null,
+                        )
+                    },
+                    onClick = {
+                        onThemeModeChanged(mode)
+                        expanded = false
+                    },
                 )
             }
         }
@@ -166,6 +236,8 @@ private fun CollectionContent(
     state: CollectionUiState.Content,
     onRefresh: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val albums = state.groups.flatMap { group -> group.albums }
     var centeredAlbum by remember(albums) { mutableStateOf(albums.firstOrNull()) }
 
@@ -177,19 +249,31 @@ private fun CollectionContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(vertical = 24.dp),
+                .padding(vertical = if (isLandscape) 12.dp else 24.dp),
         ) {
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                Text(
-                    text = centeredAlbum?.artists?.firstOrNull()?.name ?: "Моя коллекция",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = centeredAlbum?.title ?: "Альбомы сгруппированы по исполнителям",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                AnimatedContent(
+                    targetState = centeredAlbum,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "centeredAlbumTitle",
+                ) { album ->
+                    Column {
+                        Text(
+                            text = album?.artists?.firstOrNull()?.name ?: "Моя коллекция",
+                            style = if (isLandscape) {
+                                MaterialTheme.typography.headlineMedium
+                            } else {
+                                MaterialTheme.typography.headlineLarge
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = album?.title ?: "Альбомы сгруппированы по исполнителям",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
                 state.refreshError?.let { message ->
                     Text(
                         text = message,
@@ -201,6 +285,13 @@ private fun CollectionContent(
             AlbumCarousel(
                 albums = albums,
                 onCenteredAlbumChanged = { album -> centeredAlbum = album },
+                onCenteredAlbumClick = { album ->
+                    album.albumUrl?.let { url ->
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),

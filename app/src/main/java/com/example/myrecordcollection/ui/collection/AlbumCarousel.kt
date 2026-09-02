@@ -6,6 +6,7 @@ import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -50,6 +51,7 @@ fun AlbumCarousel(
     albums: List<Album>,
     modifier: Modifier = Modifier,
     onCenteredAlbumChanged: (Album) -> Unit = {},
+    onCenteredAlbumClick: (Album) -> Unit = {},
 ) {
     if (albums.isEmpty()) return
 
@@ -110,6 +112,8 @@ fun AlbumCarousel(
 
                 AlbumCarouselItem(
                     album = album,
+                    onClick = { onCenteredAlbumClick(album) },
+                    enabled = index == centeredIndex,
                     modifier = Modifier
                         .size(itemSize)
                         .zIndex(scale)
@@ -152,6 +156,8 @@ private fun carouselPoint(
 @Composable
 private fun AlbumCarouselItem(
     album: Album,
+    onClick: () -> Unit,
+    enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var imageLoaded by remember(album.localCoverPath) { mutableStateOf(false) }
@@ -159,6 +165,7 @@ private fun AlbumCarouselItem(
     Box(
         modifier = modifier
             .clip(CircleShape)
+            .clickable(enabled = enabled, onClick = onClick)
             .background(albumColor(album.id))
             .border(2.dp, Color.White.copy(alpha = 0.45f), CircleShape),
         contentAlignment = Alignment.Center,

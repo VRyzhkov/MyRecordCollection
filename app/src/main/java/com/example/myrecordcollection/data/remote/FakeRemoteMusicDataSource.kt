@@ -27,5 +27,6 @@ class FakeRemoteMusicDataSource {
         title = title,
         artists = listOf(artist),
         coverUrl = "https://picsum.photos/seed/$id/600/600",
+        albumUrl = "https://music.yandex.ru/album/$id",
     )
 }

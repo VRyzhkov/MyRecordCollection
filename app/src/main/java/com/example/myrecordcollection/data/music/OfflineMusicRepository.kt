@@ -31,6 +31,7 @@ class OfflineMusicRepository(
                             artists = listOf(artist),
                             coverUrl = row.remoteCoverUrl,
                             localCoverPath = row.localCoverPath,
+                            albumUrl = row.albumUrl,
                         )
                     },
                 )
@@ -74,6 +75,7 @@ class OfflineMusicRepository(
                 primaryArtistId = primaryArtist.id,
                 remoteCoverUrl = album.coverUrl,
                 localCoverPath = localPath,
+                albumUrl = album.albumUrl,
                 albumOrder = albumOrderById.getValue(album.id),
             )
         }

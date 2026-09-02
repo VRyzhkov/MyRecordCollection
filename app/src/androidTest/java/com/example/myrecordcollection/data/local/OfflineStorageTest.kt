@@ -34,8 +34,8 @@ class OfflineStorageTest {
         database.musicDao().replaceCollection(
             artists = listOf(ArtistEntity("artist", "Artist", groupOrder = 0)),
             albums = listOf(
-                AlbumEntity("second", "Second", "artist", null, null, albumOrder = 1),
-                AlbumEntity("first", "First", "artist", null, null, albumOrder = 0),
+                AlbumEntity("second", "Second", "artist", null, null, null, albumOrder = 1),
+                AlbumEntity("first", "First", "artist", null, null, null, albumOrder = 0),
             ),
             refs = listOf(
                 AlbumArtistCrossRef("first", "artist"),

@@ -23,5 +23,6 @@ data class AlbumEntity(
     val primaryArtistId: String,
     val remoteCoverUrl: String?,
     val localCoverPath: String?,
+    val albumUrl: String?,
     val albumOrder: Int,
 )

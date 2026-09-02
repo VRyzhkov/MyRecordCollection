@@ -14,7 +14,7 @@ class MyRecordCollectionApp : Application() {
             applicationContext,
             MusicDatabase::class.java,
             "music.db",
-        ).build()
+        ).addMigrations(MusicDatabase.MIGRATION_1_2).build()
         OfflineMusicRepository(
             musicDao = database.musicDao(),
             coverStorage = AlbumCoverStorage(applicationContext),

@@ -19,6 +19,7 @@ interface MusicDao {
                albums.title AS albumTitle,
                albums.remoteCoverUrl,
                albums.localCoverPath,
+               albums.albumUrl,
                artists.id AS artistId,
                artists.name AS artistName,
                artists.groupOrder,
