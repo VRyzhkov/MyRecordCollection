@@ -57,7 +57,7 @@ jobs:
         run: |
           export RELEASE_VERSION_NAME="${RELEASE_VERSION_NAME#v}"
           chmod +x ./gradlew
-          ./gradlew --no-daemon testReleaseUnitTest assembleRelease
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
 
       - name: Prepare APK
         shell: bash
