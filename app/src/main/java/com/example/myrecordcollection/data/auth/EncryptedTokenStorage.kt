@@ -22,13 +22,27 @@ class EncryptedTokenStorage(
         return runCatching { decrypt(encrypted) }.getOrNull()
     }
 
-    override fun saveAccessToken(token: String) {
-        require(token.isNotBlank())
-        preferences.edit().putString(ACCESS_TOKEN_KEY, encrypt(token.trim())).apply()
+    override fun getRefreshToken(): String? {
+        val encrypted = preferences.getString(REFRESH_TOKEN_KEY, null) ?: return null
+        return runCatching { decrypt(encrypted) }.getOrNull()
+    }
+
+    override fun saveTokens(accessToken: String, refreshToken: String?) {
+        require(accessToken.isNotBlank())
+        preferences.edit()
+            .putString(ACCESS_TOKEN_KEY, encrypt(accessToken.trim()))
+            .apply {
+                if (refreshToken.isNullOrBlank()) remove(REFRESH_TOKEN_KEY)
+                else putString(REFRESH_TOKEN_KEY, encrypt(refreshToken.trim()))
+            }
+            .apply()
     }
 
     override fun clear() {
-        preferences.edit().remove(ACCESS_TOKEN_KEY).apply()
+        preferences.edit()
+            .remove(ACCESS_TOKEN_KEY)
+            .remove(REFRESH_TOKEN_KEY)
+            .apply()
     }
 
     private fun encrypt(value: String): String {
@@ -75,6 +89,7 @@ class EncryptedTokenStorage(
     private companion object {
         const val PREFERENCES_NAME = "secure_auth"
         const val ACCESS_TOKEN_KEY = "access_token"
+        const val REFRESH_TOKEN_KEY = "refresh_token"
         const val KEY_STORE_NAME = "AndroidKeyStore"
         const val KEY_ALIAS = "my_record_collection_access_token"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

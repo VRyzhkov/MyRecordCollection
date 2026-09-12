@@ -21,8 +21,9 @@ class EncryptedTokenStorageTest {
     fun tokenCanBeEncryptedReadAndCleared() {
         storage.clear()
 
-        storage.saveAccessToken("secret-token")
+        storage.saveTokens("secret-token", "refresh-token")
         assertEquals("secret-token", storage.getAccessToken())
+        assertEquals("refresh-token", storage.getRefreshToken())
 
         storage.clear()
         assertNull(storage.getAccessToken())

@@ -18,7 +18,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     private val musicRepository: MusicRepository =
         (application as MyRecordCollectionApp).musicRepository
     private val tokenStorage = (application as MyRecordCollectionApp).tokenStorage
-    private val preferences = application.getSharedPreferences("auth_mode", 0)
+    private val deviceAuthClient = (application as MyRecordCollectionApp).deviceAuthClient
 
     private val _uiState = MutableStateFlow<CollectionUiState>(CollectionUiState.CheckingAuth)
     val uiState: StateFlow<CollectionUiState> = _uiState.asStateFlow()
@@ -26,37 +26,47 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     private var groups: List<ArtistGroup> = emptyList()
     private var isRefreshing = false
     private var collectionJob: Job? = null
+    private var authorizationJob: Job? = null
     private var collectionEnabled = false
 
     init {
         checkAuthorization()
     }
 
-    fun connectWithToken(token: String) {
-        if (token.isBlank()) {
-            _uiState.value = CollectionUiState.SignedOut("Введите access token")
-            return
-        }
-        runCatching { tokenStorage.saveAccessToken(token) }
-            .onSuccess {
-                preferences.edit().putBoolean(DEMO_MODE_KEY, false).apply()
+    fun startYandexAuthorization() {
+        if (_uiState.value is CollectionUiState.Authorizing) return
+        _uiState.value = CollectionUiState.Authorizing()
+        authorizationJob = viewModelScope.launch {
+            try {
+                val code = deviceAuthClient.requestCode()
+                _uiState.value = CollectionUiState.Authorizing(
+                    userCode = code.userCode,
+                    verificationUrl = code.verificationUrl,
+                )
+                val tokens = deviceAuthClient.waitForTokens(code)
+                tokenStorage.saveTokens(tokens.accessToken, tokens.refreshToken)
                 startCollection()
-            }
-            .onFailure { error ->
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
                 _uiState.value = CollectionUiState.SignedOut(
-                    error.message ?: "Не удалось безопасно сохранить токен",
+                    error.message ?: "Не удалось выполнить вход через Яндекс",
                 )
             }
+        }
     }
 
-    fun continueInDemoMode() {
-        preferences.edit().putBoolean(DEMO_MODE_KEY, true).apply()
-        startCollection()
+    fun cancelAuthorization() {
+        if (_uiState.value is CollectionUiState.Authorizing) {
+            authorizationJob?.cancel()
+            authorizationJob = null
+            _uiState.value = CollectionUiState.SignedOut()
+        }
     }
 
     fun signOut() {
+        authorizationJob?.cancel()
         tokenStorage.clear()
-        preferences.edit().putBoolean(DEMO_MODE_KEY, false).apply()
         collectionEnabled = false
         collectionJob?.cancel()
         groups = emptyList()
@@ -74,8 +84,7 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
     private fun checkAuthorization() {
         viewModelScope.launch {
             val hasToken = tokenStorage.getAccessToken() != null
-            val demoMode = preferences.getBoolean(DEMO_MODE_KEY, false)
-            if (hasToken || demoMode) startCollection() else {
+            if (hasToken) startCollection() else {
                 _uiState.value = CollectionUiState.SignedOut()
             }
         }
@@ -131,7 +140,4 @@ class CollectionViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    private companion object {
-        const val DEMO_MODE_KEY = "demo_mode"
-    }
 }

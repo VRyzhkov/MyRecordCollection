@@ -9,6 +9,12 @@ sealed interface CollectionUiState {
         val message: String? = null,
     ) : CollectionUiState
 
+    data class Authorizing(
+        val userCode: String? = null,
+        val verificationUrl: String? = null,
+        val message: String? = null,
+    ) : CollectionUiState
+
     data object Loading : CollectionUiState
 
     data object Empty : CollectionUiState
