@@ -9,6 +9,7 @@ import com.example.myrecordcollection.data.remote.MusicRemoteDataSource
 import com.example.myrecordcollection.domain.model.Album
 import com.example.myrecordcollection.domain.model.Artist
 import com.example.myrecordcollection.domain.model.ArtistGroup
+import com.example.myrecordcollection.domain.model.CollectionGroups
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -39,15 +40,11 @@ class OfflineMusicRepository(
         }
 
     override suspend fun refreshCollection() {
-        val remoteAlbums = remoteDataSource.getFavoriteAlbums().distinctBy { it.id }
-        val groupedAlbums = remoteAlbums
-            .mapNotNull { album -> album.artists.firstOrNull()?.let { it to album } }
-            .groupBy(keySelector = { it.first.id }, valueTransform = { it })
-            .values
-            .sortedBy { rows -> rows.first().first.name.lowercase() }
+        val groupedAlbums = CollectionGroups.ordered(remoteDataSource.getCollection())
+        val remoteAlbums = groupedAlbums.flatMap { it.albums }
 
         val groupOrderByArtist = groupedAlbums
-            .mapIndexed { index, rows -> rows.first().first.id to index }
+            .mapIndexed { index, group -> group.artist.id to index }
             .toMap()
         val allArtists = remoteAlbums.flatMap { it.artists }.distinctBy { it.id }
         val artistEntities = allArtists.map { artist ->
@@ -57,9 +54,8 @@ class OfflineMusicRepository(
                 groupOrder = groupOrderByArtist[artist.id] ?: Int.MAX_VALUE,
             )
         }
-        val albumOrderById = groupedAlbums.flatMap { rows ->
-            rows.sortedBy { it.second.title.lowercase() }
-                .mapIndexed { index, (_, album) -> album.id to index }
+        val albumOrderById = groupedAlbums.flatMap { group ->
+            group.albums.mapIndexed { index, album -> album.id to index }
         }.toMap()
 
         val localPaths = mutableSetOf<String>()

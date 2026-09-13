@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import com.example.myrecordcollection.domain.model.Album
+import com.example.myrecordcollection.domain.model.CollectionGroups
+import com.example.myrecordcollection.R
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -183,7 +187,13 @@ private fun AlbumCarouselItem(
             .border(2.dp, Color.White.copy(alpha = 0.45f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        if (!imageLoaded) {
+        if (album.artists.firstOrNull()?.id == CollectionGroups.likedTracks.id) {
+            Image(
+                painter = painterResource(R.drawable.liked_tracks_cover),
+                contentDescription = "Мне нравится",
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (!imageLoaded) {
             Text(
                 text = album.title,
                 color = Color.White,
@@ -198,7 +208,7 @@ private fun AlbumCarouselItem(
         if (album.localCoverPath != null) {
             AsyncImage(
                 model = album.localCoverPath,
-                contentDescription = "Обложка альбома ${album.title}",
+                contentDescription = "Обложка: ${album.title}",
                 contentScale = ContentScale.Crop,
                 onSuccess = { imageLoaded = true },
                 onError = { imageLoaded = false },
