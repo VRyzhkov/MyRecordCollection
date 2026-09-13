@@ -3,6 +3,7 @@ package com.example.myrecordcollection.ui.collection
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.view.KeyEvent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -31,10 +34,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,11 +58,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myrecordcollection.domain.model.Album
 import com.example.myrecordcollection.domain.model.Artist
 import com.example.myrecordcollection.domain.model.ArtistGroup
+import com.example.myrecordcollection.input.SteeringCommand
+import com.example.myrecordcollection.input.SteeringWheelController
 import com.example.myrecordcollection.ui.theme.MyRecordCollectionTheme
 import com.example.myrecordcollection.ui.theme.ThemeMode
+import kotlinx.coroutines.delay
 
 @Composable
 fun CollectionRoute(
+    steeringWheelController: SteeringWheelController,
     themeMode: ThemeMode,
     onThemeModeChanged: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
@@ -71,6 +81,7 @@ fun CollectionRoute(
         onStartAuthorization = viewModel::startYandexAuthorization,
         onCancelAuthorization = viewModel::cancelAuthorization,
         onSignOut = viewModel::signOut,
+        steeringWheelController = steeringWheelController,
         themeMode = themeMode,
         onThemeModeChanged = onThemeModeChanged,
         modifier = modifier,
@@ -85,6 +96,7 @@ fun CollectionScreen(
     onStartAuthorization: () -> Unit = {},
     onCancelAuthorization: () -> Unit = {},
     onSignOut: () -> Unit = {},
+    steeringWheelController: SteeringWheelController? = null,
     themeMode: ThemeMode = ThemeMode.System,
     onThemeModeChanged: (ThemeMode) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -123,6 +135,7 @@ fun CollectionScreen(
                 is CollectionUiState.Content -> CollectionContent(
                     state = uiState,
                     onRefresh = onRefresh,
+                    steeringWheelController = steeringWheelController,
                 )
             }
             SettingsMenu(
@@ -131,6 +144,7 @@ fun CollectionScreen(
                 collectionActionsEnabled = uiState is CollectionUiState.Content,
                 onRefresh = onRefresh,
                 onSignOut = onSignOut,
+                steeringWheelController = steeringWheelController,
                 modifier = Modifier.align(Alignment.TopEnd),
             )
         }
@@ -144,9 +158,11 @@ private fun SettingsMenu(
     collectionActionsEnabled: Boolean,
     onRefresh: () -> Unit,
     onSignOut: () -> Unit,
+    steeringWheelController: SteeringWheelController?,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var showSteeringSettings by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         IconButton(
@@ -160,6 +176,15 @@ private fun SettingsMenu(
             onDismissRequest = { expanded = false },
         ) {
             if (collectionActionsEnabled) {
+                if (steeringWheelController != null) {
+                    DropdownMenuItem(
+                        text = { Text("Настройка кнопок руля") },
+                        onClick = {
+                            expanded = false
+                            showSteeringSettings = true
+                        },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("Обновить коллекцию") },
                     onClick = {
@@ -197,7 +222,80 @@ private fun SettingsMenu(
             }
         }
     }
+    if (showSteeringSettings && steeringWheelController != null) {
+        SteeringSettingsDialog(
+            controller = steeringWheelController,
+            onDismiss = {
+                steeringWheelController.cancelLearning()
+                showSteeringSettings = false
+            },
+        )
+    }
 }
+
+@Composable
+private fun SteeringSettingsDialog(
+    controller: SteeringWheelController,
+    onDismiss: () -> Unit,
+) {
+    val mappings by controller.mappings.collectAsStateWithLifecycle()
+    val pendingCommand by controller.pendingCommand.collectAsStateWithLifecycle()
+
+    LaunchedEffect(pendingCommand) {
+        if (pendingCommand != null) {
+            delay(10_000)
+            controller.cancelLearning()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Кнопки руля") },
+        text = {
+            Column {
+                Text(
+                    text = pendingCommand?.let {
+                        "Нажмите кнопку для команды «${it.title}»"
+                    } ?: "Выберите команду, затем нажмите нужную кнопку на руле.",
+                    color = if (pendingCommand != null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                SteeringCommand.entries.forEach { command ->
+                    val keyCode = mappings[command]
+                    TextButton(
+                        onClick = { controller.startLearning(command) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(command.title)
+                            Text(
+                                text = keyCode?.let(::keyCodeTitle) ?: "Не назначено",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Готово") }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = controller::clearAllMappings) { Text("Очистить") }
+                TextButton(onClick = controller::resetDefaults) { Text("По умолчанию") }
+            }
+        },
+    )
+}
+
+private fun keyCodeTitle(keyCode: Int): String =
+    "${KeyEvent.keyCodeToString(keyCode).removePrefix("KEYCODE_")} ($keyCode)"
 
 @Composable
 private fun SignInContent(
@@ -392,11 +490,66 @@ private fun MessageContent(
 private fun CollectionContent(
     state: CollectionUiState.Content,
     onRefresh: () -> Unit,
+    steeringWheelController: SteeringWheelController?,
 ) {
     val context = LocalContext.current
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val albums = state.groups.flatMap { group -> group.albums }
     var centeredAlbum by remember(albums) { mutableStateOf(albums.firstOrNull()) }
+    var requestedIndex by remember(albums) { mutableStateOf<Int?>(null) }
+    var navigationRequestId by remember(albums) { mutableIntStateOf(0) }
+    val currentCenteredAlbum by rememberUpdatedState(centeredAlbum)
+
+    DisposableEffect(steeringWheelController) {
+        steeringWheelController?.setEnabled(true)
+        onDispose { steeringWheelController?.setEnabled(false) }
+    }
+
+    fun openAlbum(album: Album?) {
+        album?.albumUrl?.let { url ->
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            }
+        }
+    }
+
+    LaunchedEffect(steeringWheelController, albums, state.groups) {
+        steeringWheelController?.commands?.collect { command ->
+            val currentIndex = currentCenteredAlbum?.let { current ->
+                albums.indexOfFirst { it.id == current.id }
+            }?.takeIf { it >= 0 } ?: 0
+            val targetIndex = when (command) {
+                SteeringCommand.NextAlbum -> (currentIndex + 1).coerceAtMost(albums.lastIndex)
+                SteeringCommand.PreviousAlbum -> (currentIndex - 1).coerceAtLeast(0)
+                SteeringCommand.NextArtist -> state.groups
+                    .dropWhile { group -> group.albums.none { it.id == albums[currentIndex].id } }
+                    .drop(1)
+                    .firstOrNull()
+                    ?.albums
+                    ?.firstOrNull()
+                    ?.let { album -> albums.indexOfFirst { it.id == album.id } }
+                    ?: currentIndex
+                SteeringCommand.PreviousArtist -> {
+                    val groupIndex = state.groups.indexOfFirst { group ->
+                        group.albums.any { it.id == albums[currentIndex].id }
+                    }
+                    state.groups.getOrNull(groupIndex - 1)
+                        ?.albums
+                        ?.firstOrNull()
+                        ?.let { album -> albums.indexOfFirst { it.id == album.id } }
+                        ?: currentIndex
+                }
+                SteeringCommand.PlayAlbum -> {
+                    openAlbum(currentCenteredAlbum)
+                    currentIndex
+                }
+            }
+            if (command != SteeringCommand.PlayAlbum) {
+                requestedIndex = targetIndex
+                navigationRequestId++
+            }
+        }
+    }
 
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
@@ -441,14 +594,12 @@ private fun CollectionContent(
             }
             AlbumCarousel(
                 albums = albums,
-                onCenteredAlbumChanged = { album -> centeredAlbum = album },
-                onCenteredAlbumClick = { album ->
-                    album.albumUrl?.let { url ->
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        }
-                    }
+                requestedIndex = requestedIndex,
+                navigationRequestId = navigationRequestId,
+                onCenteredAlbumChanged = { album ->
+                    centeredAlbum = album
                 },
+                onCenteredAlbumClick = ::openAlbum,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),

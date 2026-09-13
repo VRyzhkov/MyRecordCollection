@@ -3,6 +3,7 @@ package com.example.myrecordcollection
 import android.os.Bundle
 import android.content.Intent
 import android.net.Uri
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,13 +20,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import com.example.myrecordcollection.data.update.AvailableUpdate
 import com.example.myrecordcollection.data.update.GitHubUpdateChecker
+import com.example.myrecordcollection.input.SteeringWheelController
 import com.example.myrecordcollection.ui.collection.CollectionRoute
 import com.example.myrecordcollection.ui.theme.MyRecordCollectionTheme
 import com.example.myrecordcollection.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
+    private lateinit var steeringWheelController: SteeringWheelController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        steeringWheelController = SteeringWheelController(this)
         enableEdgeToEdge()
         setContent {
             var availableUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
@@ -56,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
             MyRecordCollectionTheme(darkTheme = darkTheme) {
                 CollectionRoute(
+                    steeringWheelController = steeringWheelController,
                     themeMode = themeMode,
                     onThemeModeChanged = { newMode ->
                         themeMode = newMode
@@ -91,5 +97,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        steeringWheelController.handleKeyEvent(event) || super.dispatchKeyEvent(event)
+
+    override fun onResume() {
+        super.onResume()
+        steeringWheelController.setActivityResumed(true)
+    }
+
+    override fun onPause() {
+        steeringWheelController.setActivityResumed(false)
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        steeringWheelController.release()
+        super.onDestroy()
     }
 }

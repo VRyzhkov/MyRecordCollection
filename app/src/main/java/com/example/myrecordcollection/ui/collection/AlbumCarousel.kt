@@ -52,6 +52,8 @@ fun AlbumCarousel(
     modifier: Modifier = Modifier,
     onCenteredAlbumChanged: (Album) -> Unit = {},
     onCenteredAlbumClick: (Album) -> Unit = {},
+    requestedIndex: Int? = null,
+    navigationRequestId: Int = 0,
 ) {
     if (albums.isEmpty()) return
 
@@ -65,6 +67,17 @@ fun AlbumCarousel(
 
     LaunchedEffect(albums, centeredIndex) {
         onCenteredAlbumChanged(albums[centeredIndex])
+    }
+
+    LaunchedEffect(albums, navigationRequestId) {
+        val target = requestedIndex?.coerceIn(albums.indices)?.toFloat() ?: return@LaunchedEffect
+        if (target == position) return@LaunchedEffect
+        settleJob?.cancel()
+        val animatedPosition = Animatable(position)
+        animatedPosition.animateTo(
+            targetValue = target,
+            animationSpec = spring(dampingRatio = 0.82f, stiffness = 420f),
+        ) { position = value }
     }
 
     BoxWithConstraints(modifier = modifier) {
