@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep the record inside the adaptive icon safe zone. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="12.5%">
+    <bitmap android:src="@drawable/vinyl_record" android:gravity="fill" />
+</inset>
