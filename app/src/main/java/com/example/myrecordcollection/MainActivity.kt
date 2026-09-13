@@ -3,23 +3,26 @@ package com.example.myrecordcollection
 import android.os.Bundle
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.example.myrecordcollection.data.update.AvailableUpdate
-import com.example.myrecordcollection.data.update.GitHubUpdateChecker
+import com.example.myrecordcollection.data.update.UpdatePhase
+import com.example.myrecordcollection.data.update.UpdateViewModel
 import com.example.myrecordcollection.input.SteeringWheelController
 import com.example.myrecordcollection.ui.collection.CollectionRoute
 import com.example.myrecordcollection.ui.theme.MyRecordCollectionTheme
@@ -27,13 +30,32 @@ import com.example.myrecordcollection.ui.theme.ThemeMode
 
 class MainActivity : ComponentActivity() {
     private lateinit var steeringWheelController: SteeringWheelController
+    private val updateViewModel: UpdateViewModel by viewModels()
+    private val installPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (packageManager.canRequestPackageInstalls()) installUpdate()
+        else updateViewModel.showInstallError("Установка не разрешена. Нажмите «Установить» и разрешите установку из MyRecordCollection в настройках Android.")
+    }
+
+    private fun installUpdate() {
+        try {
+            if (!packageManager.canRequestPackageInstalls()) {
+                updateViewModel.showInstallError("Разрешите установку из MyRecordCollection, затем вернитесь в приложение.")
+                installPermission.launch(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            } else {
+                startActivity(updateViewModel.installerIntent())
+                updateViewModel.showInstallError("APK готов. Завершите установку в окне Android. Если вы отменили её, нажмите «Установить» ещё раз.")
+            }
+        } catch (_: Exception) {
+            updateViewModel.showInstallError("Не удалось открыть установщик. Проверьте разрешение на установку и наличие системного установщика APK.")
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         steeringWheelController = SteeringWheelController(this)
         enableEdgeToEdge()
         setContent {
-            var availableUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
+            val updateState by updateViewModel.state.collectAsStateWithLifecycle()
             val preferences = remember {
                 getSharedPreferences("appearance", MODE_PRIVATE)
             }
@@ -49,16 +71,6 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.Dark -> true
             }
 
-            LaunchedEffect(Unit) {
-                val currentVersion = packageManager
-                    .getPackageInfo(packageName, 0)
-                    .versionName
-                    .orEmpty()
-                availableUpdate = runCatching {
-                    GitHubUpdateChecker().findUpdate(currentVersion)
-                }.getOrNull()
-            }
-
             MyRecordCollectionTheme(darkTheme = darkTheme) {
                 CollectionRoute(
                     steeringWheelController = steeringWheelController,
@@ -69,28 +81,25 @@ class MainActivity : ComponentActivity() {
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
-                availableUpdate?.let { update ->
+                if (updateState.phase != UpdatePhase.Hidden) {
                     AlertDialog(
-                        onDismissRequest = { availableUpdate = null },
-                        title = { Text("Доступно обновление") },
+                        onDismissRequest = { if (updateState.phase != UpdatePhase.Downloading) updateViewModel.dismiss() },
+                        title = { Text("Обновление ${updateState.update?.versionName.orEmpty()}") },
                         text = {
-                            Text("Доступна версия ${update.versionName}. Скачать APK с GitHub?")
+                            Text(if (updateState.phase == UpdatePhase.Offer) "Скачать новую версию с GitHub? После загрузки появится кнопка установки." else updateState.message)
                         },
                         confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    startActivity(
-                                        Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)),
-                                    )
-                                    availableUpdate = null
-                                },
-                            ) {
-                                Text("Скачать")
+                            when (updateState.phase) {
+                                UpdatePhase.Offer, UpdatePhase.Failed -> TextButton(onClick = updateViewModel::download) {
+                                    Text(if (updateState.phase == UpdatePhase.Failed) "Повторить" else "Скачать")
+                                }
+                                UpdatePhase.Ready -> TextButton(onClick = ::installUpdate) { Text("Установить") }
+                                else -> Unit
                             }
                         },
                         dismissButton = {
-                            TextButton(onClick = { availableUpdate = null }) {
-                                Text("Позже")
+                            TextButton(onClick = updateViewModel::dismiss) {
+                                Text(if (updateState.phase == UpdatePhase.Downloading) "Отменить загрузку" else "Позже")
                             }
                         },
                     )
