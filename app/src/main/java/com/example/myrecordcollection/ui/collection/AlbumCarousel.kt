@@ -100,7 +100,7 @@ fun AlbumCarousel(
                     },
                 ),
         ) {
-            val itemSize = if (isLandscape) 124.dp else 112.dp
+            val itemSize = if (isLandscape) 152.dp else 140.dp
             val itemSizePx = with(density) { itemSize.toPx() }
 
             albums.forEachIndexed { index, album ->
