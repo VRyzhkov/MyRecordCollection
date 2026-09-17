@@ -15,11 +15,11 @@ class YandexMusicRemoteDataSourceTest {
         override fun clear() = Unit
     }
 
-    private fun source(own: String = "[]", saved: String = "[]", albums: String = "[]") =
+    private fun source(own: String = "[]", saved: String = "[]", albums: String = "[]", account: String = """{"uid":42}""") =
         YandexMusicRemoteDataSource(tokens) { url, token ->
             assertEquals("test-token", token)
             JSONObject(when {
-                url.endsWith("/account/status") -> """{"result":{"account":{"uid":42}}}"""
+                url.endsWith("/account/status") -> """{"result":{"account":$account}}"""
                 url.endsWith("/playlists/list") -> """{"result":$own}"""
                 url.endsWith("/likes/playlists") -> """{"result":$saved}"""
                 url.endsWith("/likes/albums?rich=true") -> """{"result":$albums}"""
@@ -44,12 +44,18 @@ class YandexMusicRemoteDataSourceTest {
 
         assertEquals(listOf("liked-tracks:42", "playlist:42:7", "playlist:99:7", "playlist:99:3", "7"), result.map { it.id })
         assertEquals("Мне нравится", result.first().title)
-        assertEquals("https://music.yandex.ru/collection/tracks", result.first().albumUrl)
+        assertEquals("https://music.yandex.ru/users/42/playlists/3", result.first().albumUrl)
         assertEquals("https://music.yandex.ru/users/test%20user/playlists/7", result[1].albumUrl)
         assertEquals("https://music.yandex.ru/playlists/uuid-99", result[2].albumUrl)
         assertEquals("https://img.test/600x600", result[1].coverUrl)
         assertEquals("https://img.test/tile/600x600", result[2].coverUrl)
         assertEquals("https://music.yandex.ru/album/7", result.last().albumUrl)
+    }
+
+    @Test
+    fun likedTracksUsesEncodedAccountLoginWhenAvailable() = runBlocking {
+        val result = source(account = """{"uid":42,"login":"test user"}""").getCollection()
+        assertEquals("https://music.yandex.ru/users/test%20user/playlists/3", result.first().albumUrl)
     }
 
     @Test

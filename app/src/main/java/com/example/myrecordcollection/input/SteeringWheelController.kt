@@ -2,9 +2,14 @@ package com.example.myrecordcollection.input
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.media.VolumeProvider
+import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +18,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class SteeringWheelController(context: Context) {
+class SteeringWheelController(
+    context: Context,
+    private val onMediaControllerChanged: (MediaController?) -> Unit = {},
+) {
+    private val audioManager = context.getSystemService(AudioManager::class.java)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val consumedKeys = mutableSetOf<Int>()
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val _mappings = MutableStateFlow(loadMappings())
     val mappings: StateFlow<Map<SteeringCommand, Int>> = _mappings.asStateFlow()
@@ -32,6 +43,24 @@ class SteeringWheelController(context: Context) {
     @Suppress("DEPRECATION")
     private val mediaSession = MediaSession(context, "MyRecordCollectionSteering").apply {
         setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS)
+        // Some head units route volume through the session instead of Activity key events.
+        setPlaybackToRemote(object : VolumeProvider(VOLUME_CONTROL_RELATIVE, 100, 50) {
+            override fun onAdjustVolume(direction: Int) {
+                mainHandler.post {
+                    if (!isActive) return@post
+                    val keyCode = when (direction) {
+                        AudioManager.ADJUST_RAISE -> KeyEvent.KEYCODE_VOLUME_UP
+                        AudioManager.ADJUST_LOWER -> KeyEvent.KEYCODE_VOLUME_DOWN
+                        else -> return@post
+                    }
+                    if (!handleKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))) {
+                        audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+                    } else {
+                        handleKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                    }
+                }
+            }
+        })
         setPlaybackState(
             PlaybackState.Builder()
                 .setActions(
@@ -61,6 +90,7 @@ class SteeringWheelController(context: Context) {
                     dispatchDefaultMediaCommand(SteeringCommand.PlayAlbum)
                 }
             },
+            mainHandler,
         )
     }
 
@@ -96,8 +126,10 @@ class SteeringWheelController(context: Context) {
     }
 
     fun handleKeyEvent(event: KeyEvent): Boolean {
-        if (!isActive || event.action != KeyEvent.ACTION_DOWN) return false
-        if (event.repeatCount > 0) return isMappedOrLearning(event.keyCode)
+        if (!isActive) return false
+        if (event.action == KeyEvent.ACTION_UP) return consumedKeys.remove(event.keyCode)
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        if (event.repeatCount > 0) return event.keyCode in consumedKeys || isMappedOrLearning(event.keyCode)
 
         _pendingCommand.value?.let { command ->
             val updated = _mappings.value
@@ -106,6 +138,7 @@ class SteeringWheelController(context: Context) {
                 .apply { put(command, event.keyCode) }
             saveMappings(updated)
             _pendingCommand.value = null
+            consumedKeys.add(event.keyCode)
             return true
         }
 
@@ -114,10 +147,12 @@ class SteeringWheelController(context: Context) {
             ?.key
             ?: return false
         emitDebounced(command, event.keyCode)
+        consumedKeys.add(event.keyCode)
         return true
     }
 
     fun release() {
+        onMediaControllerChanged(null)
         mediaSession.release()
     }
 
@@ -151,6 +186,8 @@ class SteeringWheelController(context: Context) {
 
     private fun updateActiveState() {
         mediaSession.isActive = isActive
+        onMediaControllerChanged(if (isActive) mediaSession.controller else null)
+        if (!isActive) consumedKeys.clear()
     }
 
     private val isActive: Boolean

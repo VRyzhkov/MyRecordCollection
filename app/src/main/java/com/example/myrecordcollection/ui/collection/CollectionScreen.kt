@@ -1,6 +1,7 @@
 package com.example.myrecordcollection.ui.collection
 
 import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.content.res.Configuration
 import android.net.Uri
 import android.view.KeyEvent
@@ -9,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -240,6 +245,7 @@ private fun SteeringSettingsDialog(
 ) {
     val mappings by controller.mappings.collectAsStateWithLifecycle()
     val pendingCommand by controller.pendingCommand.collectAsStateWithLifecycle()
+    val keyFocus = remember { FocusRequester() }
 
     LaunchedEffect(pendingCommand) {
         if (pendingCommand != null) {
@@ -252,7 +258,13 @@ private fun SteeringSettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text("Кнопки руля") },
         text = {
-            Column {
+            LaunchedEffect(Unit) { keyFocus.requestFocus() }
+            Column(
+                modifier = Modifier
+                    .onPreviewKeyEvent { controller.handleKeyEvent(it.nativeKeyEvent) }
+                    .focusRequester(keyFocus)
+                    .focusable(),
+            ) {
                 Text(
                     text = pendingCommand?.let {
                         "Нажмите кнопку для команды «${it.title}»"
@@ -507,8 +519,18 @@ private fun CollectionContent(
 
     fun openAlbum(album: Album?) {
         album?.albumUrl?.let { url ->
+            // Older offline collections still contain the browser-only collection route.
+            val targetUrl = if (url == "https://music.yandex.ru/collection/tracks" &&
+                album.id.startsWith("liked-tracks:")) {
+                "https://music.yandex.ru/users/${Uri.encode(album.id.removePrefix("liked-tracks:"))}/playlists/3"
+            } else url
             runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl))
+                try {
+                    context.startActivity(Intent(intent).setPackage("ru.yandex.music"))
+                } catch (_: ActivityNotFoundException) {
+                    context.startActivity(intent)
+                }
             }
         }
     }
@@ -599,7 +621,7 @@ private fun CollectionContent(
                 onCenteredAlbumChanged = { album ->
                     centeredAlbum = album
                 },
-                onCenteredAlbumClick = ::openAlbum,
+                onAlbumClick = ::openAlbum,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),

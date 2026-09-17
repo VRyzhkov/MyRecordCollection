@@ -1,5 +1,7 @@
 # MyRecordCollection
 
+[Скачать APK — релизы](https://github.com/VRyzhkov/MyRecordCollection/releases)
+
 Нативное Android-приложение для просмотра плейлистов и любимых альбомов из Яндекс Музыки.
 
 Для пользования приложением у вас должен быть доступ к яндекс музыке

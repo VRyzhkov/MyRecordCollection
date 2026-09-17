@@ -33,7 +33,7 @@ class YandexMusicRemoteDataSource(
                 id = "liked-tracks:$userId",
                 title = "Мне нравится",
                 artists = listOf(CollectionGroups.likedTracks),
-                albumUrl = "https://music.yandex.ru/collection/tracks",
+                albumUrl = "https://music.yandex.ru/users/${(account.text("login") ?: userId).urlSegment()}/playlists/3",
             ))
             for (index in 0 until ownPlaylists.length()) {
                 val playlist = ownPlaylists.optJSONObject(index) ?: continue

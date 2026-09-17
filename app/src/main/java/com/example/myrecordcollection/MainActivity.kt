@@ -52,7 +52,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        steeringWheelController = SteeringWheelController(this)
+        steeringWheelController = SteeringWheelController(this) { controller ->
+            setMediaController(controller)
+        }
         enableEdgeToEdge()
         setContent {
             val updateState by updateViewModel.state.collectAsStateWithLifecycle()
@@ -114,6 +116,14 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         steeringWheelController.setActivityResumed(true)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && currentFocus == null) {
+            window.decorView.isFocusableInTouchMode = true
+            window.decorView.requestFocus()
+        }
     }
 
     override fun onPause() {
