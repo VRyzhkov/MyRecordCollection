@@ -47,7 +47,9 @@ class YandexMusicRemoteDataSource(
             for (index in 0 until result.length()) {
                 val like = result.getJSONObject(index)
                 val albumJson = like.optJSONObject("album") ?: continue
-                parseAlbum(albumJson)?.let(::add)
+                parseAlbum(albumJson)?.let { album ->
+                    add(enrichAlbumTracks(album, token))
+                }
             }
         }.distinctBy { it.id }
     }
@@ -120,20 +122,7 @@ class YandexMusicRemoteDataSource(
         if (artists.isEmpty()) return null
 
         val coverUrl = json.text("coverUri")?.toCoverUrl()
-        val tracks = buildList {
-            val volumes = json.optJSONArray("volumes")
-            if (volumes != null) {
-                for (volumeIndex in 0 until volumes.length()) {
-                    val volume = volumes.optJSONArray(volumeIndex) ?: continue
-                    for (trackIndex in 0 until volume.length()) {
-                        volume.optJSONObject(trackIndex)?.text("title")?.let(::add)
-                    }
-                }
-            }
-            json.optJSONArray("tracks")?.let { array ->
-                for (index in 0 until array.length()) array.optJSONObject(index)?.text("title")?.let(::add)
-            }
-        }
+        val tracks = parseTrackTitles(json)
 
         return Album(
             id = id,
@@ -144,6 +133,34 @@ class YandexMusicRemoteDataSource(
             year = json.optInt("year").takeIf { it > 0 },
             tracks = tracks,
         )
+    }
+
+    private fun enrichAlbumTracks(album: Album, token: String): Album {
+        if (album.tracks.isNotEmpty()) return album
+        return runCatching {
+            val details = getJson("$BASE_URL/albums/${album.id}/with-tracks", token)
+            val result = details.optJSONObject("result") ?: details
+            album.copy(
+                year = album.year ?: result.optInt("year").takeIf { it > 0 },
+                tracks = parseTrackTitles(result),
+            )
+        }.getOrDefault(album)
+    }
+
+    private fun parseTrackTitles(json: JSONObject): List<String> = buildList {
+        fun addArray(array: JSONArray) {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                item.text("title")?.let(::add)
+            }
+        }
+        json.optJSONArray("tracks")?.let(::addArray)
+        json.optJSONArray("volumes")?.let { volumes ->
+            for (index in 0 until volumes.length()) {
+                val volume = volumes.optJSONArray(index) ?: continue
+                addArray(volume)
+            }
+        }
     }
 
     private fun JSONObject.text(key: String): String? =
