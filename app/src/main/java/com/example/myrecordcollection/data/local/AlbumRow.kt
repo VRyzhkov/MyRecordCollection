@@ -6,6 +6,8 @@ data class AlbumRow(
     val remoteCoverUrl: String?,
     val localCoverPath: String?,
     val albumUrl: String?,
+    val year: Int?,
+    val tracks: String?,
     val artistId: String,
     val artistName: String,
     val groupOrder: Int,

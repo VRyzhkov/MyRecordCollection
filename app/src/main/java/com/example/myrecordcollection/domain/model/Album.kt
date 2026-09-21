@@ -7,4 +7,6 @@ data class Album(
     val coverUrl: String? = null,
     val localCoverPath: String? = null,
     val albumUrl: String? = null,
+    val year: Int? = null,
+    val tracks: List<String> = emptyList(),
 )

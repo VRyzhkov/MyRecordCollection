@@ -33,6 +33,8 @@ class OfflineMusicRepository(
                             coverUrl = row.remoteCoverUrl,
                             localCoverPath = row.localCoverPath,
                             albumUrl = row.albumUrl,
+                            year = row.year,
+                            tracks = row.tracks?.split("\u001f").orEmpty().filter { it.isNotBlank() },
                         )
                     },
                 )
@@ -72,6 +74,8 @@ class OfflineMusicRepository(
                 remoteCoverUrl = album.coverUrl,
                 localCoverPath = localPath,
                 albumUrl = album.albumUrl,
+                year = album.year,
+                tracks = album.tracks.joinToString("\u001f").takeIf { it.isNotBlank() },
                 albumOrder = albumOrderById.getValue(album.id),
             )
         }

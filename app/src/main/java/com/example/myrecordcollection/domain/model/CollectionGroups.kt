@@ -16,7 +16,7 @@ object CollectionGroups {
             ArtistGroup(
                 artist,
                 if (artist.id == likedTracks.id || artist.id == playlists.id) albums
-                else albums.sortedBy { it.title.lowercase() },
+                else albums.sortedWith(compareByDescending<Album> { it.year ?: Int.MIN_VALUE }.thenBy { it.title.lowercase() }),
             )
         }
 

@@ -39,6 +39,9 @@ class SteeringWheelController(
     private var activityResumed = false
     private var lastKeyCode = KeyEvent.KEYCODE_UNKNOWN
     private var lastEventTime = 0L
+    private var pendingClick: PendingClick? = null
+
+    private data class PendingClick(val keyCode: Int, val command: SteeringCommand, val runnable: Runnable)
 
     @Suppress("DEPRECATION")
     private val mediaSession = MediaSession(context, "MyRecordCollectionSteering").apply {
@@ -133,7 +136,6 @@ class SteeringWheelController(
 
         _pendingCommand.value?.let { command ->
             val updated = _mappings.value
-                .filterValues { it != event.keyCode }
                 .toMutableMap()
                 .apply { put(command, event.keyCode) }
             saveMappings(updated)
@@ -146,7 +148,28 @@ class SteeringWheelController(
             .firstOrNull { (_, keyCode) -> keyCode == event.keyCode }
             ?.key
             ?: return false
-        emitDebounced(command, event.keyCode)
+        val previous = pendingClick
+        if (previous != null && previous.keyCode == event.keyCode) {
+            mainHandler.removeCallbacks(previous.runnable)
+            pendingClick = null
+            val doubleCommand = doubleCommand(command)
+            if (doubleCommand != null && _mappings.value[doubleCommand] == event.keyCode) {
+                emitDebounced(doubleCommand, event.keyCode)
+            } else {
+                emitDebounced(previous.command, event.keyCode)
+                emitDebounced(command, event.keyCode)
+            }
+        } else {
+            pendingClick?.let { mainHandler.removeCallbacks(it.runnable) }
+            val runnable = Runnable {
+                if (pendingClick?.keyCode == event.keyCode) {
+                    pendingClick = null
+                    emitDebounced(command, event.keyCode)
+                }
+            }
+            pendingClick = PendingClick(event.keyCode, command, runnable)
+            mainHandler.postDelayed(runnable, DOUBLE_CLICK_TIMEOUT_MILLIS)
+        }
         consumedKeys.add(event.keyCode)
         return true
     }
@@ -157,7 +180,10 @@ class SteeringWheelController(
     }
 
     private fun dispatchDefaultMediaCommand(command: SteeringCommand) {
-        if (isActive && _pendingCommand.value == null) emitDebounced(command, command.ordinal)
+        if (isActive && _pendingCommand.value == null) {
+            val keyCode = _mappings.value[command] ?: command.ordinal
+            handleKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        }
     }
 
     private fun emitDebounced(command: SteeringCommand, keyCode: Int) {
@@ -202,6 +228,15 @@ class SteeringWheelController(
         _mappings.value = mappings
     }
 
+    private fun doubleCommand(command: SteeringCommand): SteeringCommand? = when (command) {
+        SteeringCommand.NextAlbum -> SteeringCommand.DoubleNextAlbum
+        SteeringCommand.PreviousAlbum -> SteeringCommand.DoublePreviousAlbum
+        SteeringCommand.NextArtist -> SteeringCommand.DoubleNextArtist
+        SteeringCommand.PreviousArtist -> SteeringCommand.DoublePreviousArtist
+        SteeringCommand.PlayAlbum -> SteeringCommand.DoublePlayAlbum
+        else -> null
+    }
+
     @Suppress("DEPRECATION")
     private fun Intent.keyEvent(): KeyEvent? =
         getParcelableExtra(Intent.EXTRA_KEY_EVENT) as? KeyEvent
@@ -213,6 +248,7 @@ class SteeringWheelController(
         const val PREFERENCES_NAME = "steering_wheel_controls"
         const val CUSTOMIZED_KEY = "customized"
         const val DEBOUNCE_MILLIS = 180L
+        const val DOUBLE_CLICK_TIMEOUT_MILLIS = 280L
 
         val DEFAULT_MAPPINGS = mapOf(
             SteeringCommand.NextAlbum to KeyEvent.KEYCODE_MEDIA_NEXT,
@@ -220,6 +256,11 @@ class SteeringWheelController(
             SteeringCommand.NextArtist to KeyEvent.KEYCODE_VOLUME_UP,
             SteeringCommand.PreviousArtist to KeyEvent.KEYCODE_VOLUME_DOWN,
             SteeringCommand.PlayAlbum to KeyEvent.KEYCODE_CALL,
+            SteeringCommand.DoubleNextAlbum to KeyEvent.KEYCODE_MEDIA_NEXT,
+            SteeringCommand.DoublePreviousAlbum to KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            SteeringCommand.DoubleNextArtist to KeyEvent.KEYCODE_VOLUME_UP,
+            SteeringCommand.DoublePreviousArtist to KeyEvent.KEYCODE_VOLUME_DOWN,
+            SteeringCommand.DoublePlayAlbum to KeyEvent.KEYCODE_CALL,
         )
     }
 }

@@ -120,6 +120,20 @@ class YandexMusicRemoteDataSource(
         if (artists.isEmpty()) return null
 
         val coverUrl = json.text("coverUri")?.toCoverUrl()
+        val tracks = buildList {
+            val volumes = json.optJSONArray("volumes")
+            if (volumes != null) {
+                for (volumeIndex in 0 until volumes.length()) {
+                    val volume = volumes.optJSONArray(volumeIndex) ?: continue
+                    for (trackIndex in 0 until volume.length()) {
+                        volume.optJSONObject(trackIndex)?.text("title")?.let(::add)
+                    }
+                }
+            }
+            json.optJSONArray("tracks")?.let { array ->
+                for (index in 0 until array.length()) array.optJSONObject(index)?.text("title")?.let(::add)
+            }
+        }
 
         return Album(
             id = id,
@@ -127,6 +141,8 @@ class YandexMusicRemoteDataSource(
             artists = artists,
             coverUrl = coverUrl,
             albumUrl = "https://music.yandex.ru/album/$id",
+            year = json.optInt("year").takeIf { it > 0 },
+            tracks = tracks,
         )
     }
 

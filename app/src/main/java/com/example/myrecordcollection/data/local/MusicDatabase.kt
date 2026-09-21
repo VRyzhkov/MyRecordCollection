@@ -16,7 +16,7 @@ import com.example.myrecordcollection.data.local.entity.SyncMetadataEntity
         AlbumArtistCrossRef::class,
         SyncMetadataEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class MusicDatabase : RoomDatabase() {
@@ -26,6 +26,12 @@ abstract class MusicDatabase : RoomDatabase() {
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE albums ADD COLUMN albumUrl TEXT")
+            }
+        }
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE albums ADD COLUMN year INTEGER")
+                db.execSQL("ALTER TABLE albums ADD COLUMN tracks TEXT")
             }
         }
     }

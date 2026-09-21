@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.contentDescription
@@ -274,6 +275,12 @@ private fun SteeringSettingsDialog(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Двойное нажатие настраивается отдельно. Если магнитола не передаёт кнопку Android, приложение её не увидит. Кнопки ответа и завершения звонка зависят от устройства.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 SteeringCommand.entries.forEach { command ->
@@ -541,9 +548,9 @@ private fun CollectionContent(
                 albums.indexOfFirst { it.id == current.id }
             }?.takeIf { it >= 0 } ?: 0
             val targetIndex = when (command) {
-                SteeringCommand.NextAlbum -> (currentIndex + 1).coerceAtMost(albums.lastIndex)
-                SteeringCommand.PreviousAlbum -> (currentIndex - 1).coerceAtLeast(0)
-                SteeringCommand.NextArtist -> state.groups
+                SteeringCommand.NextAlbum, SteeringCommand.DoubleNextAlbum -> (currentIndex + 1).coerceAtMost(albums.lastIndex)
+                SteeringCommand.PreviousAlbum, SteeringCommand.DoublePreviousAlbum -> (currentIndex - 1).coerceAtLeast(0)
+                SteeringCommand.NextArtist, SteeringCommand.DoubleNextArtist -> state.groups
                     .dropWhile { group -> group.albums.none { it.id == albums[currentIndex].id } }
                     .drop(1)
                     .firstOrNull()
@@ -551,7 +558,7 @@ private fun CollectionContent(
                     ?.firstOrNull()
                     ?.let { album -> albums.indexOfFirst { it.id == album.id } }
                     ?: currentIndex
-                SteeringCommand.PreviousArtist -> {
+                SteeringCommand.PreviousArtist, SteeringCommand.DoublePreviousArtist -> {
                     val groupIndex = state.groups.indexOfFirst { group ->
                         group.albums.any { it.id == albums[currentIndex].id }
                     }
@@ -561,12 +568,12 @@ private fun CollectionContent(
                         ?.let { album -> albums.indexOfFirst { it.id == album.id } }
                         ?: currentIndex
                 }
-                SteeringCommand.PlayAlbum -> {
+                SteeringCommand.PlayAlbum, SteeringCommand.DoublePlayAlbum -> {
                     openAlbum(currentCenteredAlbum)
                     currentIndex
                 }
             }
-            if (command != SteeringCommand.PlayAlbum) {
+            if (command != SteeringCommand.PlayAlbum && command != SteeringCommand.DoublePlayAlbum) {
                 requestedIndex = targetIndex
                 navigationRequestId++
             }
@@ -600,9 +607,12 @@ private fun CollectionContent(
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = album?.title ?: "Альбомы сгруппированы по исполнителям",
+                            text = listOfNotNull(album?.year?.toString(), album?.title)
+                                .joinToString(" ")
+                                .ifBlank { "Альбомы сгруппированы по исполнителям" },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = if (isLandscape) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
@@ -614,18 +624,25 @@ private fun CollectionContent(
                     )
                 }
             }
-            AlbumCarousel(
-                albums = albums,
-                requestedIndex = requestedIndex,
-                navigationRequestId = navigationRequestId,
-                onCenteredAlbumChanged = { album ->
-                    centeredAlbum = album
-                },
-                onAlbumClick = ::openAlbum,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            )
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                if (!centeredAlbum?.tracks.isNullOrEmpty()) {
+                    Text(
+                        text = centeredAlbum!!.tracks.joinToString("\n"),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = if (isLandscape) 4 else 9,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    )
+                }
+                AlbumCarousel(
+                    albums = albums,
+                    requestedIndex = requestedIndex,
+                    navigationRequestId = navigationRequestId,
+                    onCenteredAlbumChanged = { album -> centeredAlbum = album },
+                    onAlbumClick = ::openAlbum,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }

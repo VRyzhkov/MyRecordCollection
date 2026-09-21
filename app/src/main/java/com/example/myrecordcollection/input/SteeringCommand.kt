@@ -6,4 +6,9 @@ enum class SteeringCommand(val title: String) {
     NextArtist("Перейти к следующему исполнителю"),
     PreviousArtist("Перейти к предыдущему исполнителю"),
     PlayAlbum("Воспроизвести выбранный альбом"),
+    DoubleNextAlbum("Двойное нажатие: следующий альбом"),
+    DoublePreviousAlbum("Двойное нажатие: предыдущий альбом"),
+    DoubleNextArtist("Двойное нажатие: следующий исполнитель"),
+    DoublePreviousArtist("Двойное нажатие: предыдущий исполнитель"),
+    DoublePlayAlbum("Двойное нажатие: воспроизвести альбом"),
 }
