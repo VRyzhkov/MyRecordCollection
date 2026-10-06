@@ -180,10 +180,9 @@ class SteeringWheelController(
     }
 
     private fun dispatchDefaultMediaCommand(command: SteeringCommand) {
-        // MediaSession may deliver skip callbacks without a KeyEvent. These are
-        // already semantic single-click commands, so dispatch them immediately;
-        // double-click detection remains in handleKeyEvent for physical keys.
-        if (isActive && _pendingCommand.value == null) _commands.tryEmit(command)
+        if (isActive && _pendingCommand.value == null) {
+            emitDebounced(command, command.ordinal)
+        }
     }
 
     private fun emitDebounced(command: SteeringCommand, keyCode: Int) {
