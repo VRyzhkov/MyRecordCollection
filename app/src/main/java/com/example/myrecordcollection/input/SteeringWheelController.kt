@@ -40,12 +40,17 @@ class SteeringWheelController(
     private var lastKeyCode = KeyEvent.KEYCODE_UNKNOWN
     private var lastEventTime = 0L
     private var pendingClick: PendingClick? = null
+    private var pendingMediaClick: PendingMediaClick? = null
 
     private data class PendingClick(val keyCode: Int, val command: SteeringCommand, val runnable: Runnable)
+    private data class PendingMediaClick(val command: SteeringCommand, val runnable: Runnable)
 
     @Suppress("DEPRECATION")
     private val mediaSession = MediaSession(context, "MyRecordCollectionSteering").apply {
-        setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS)
+        setFlags(
+            MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or
+                MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS,
+        )
         // Some head units route volume through the session instead of Activity key events.
         setPlaybackToRemote(object : VolumeProvider(VOLUME_CONTROL_RELATIVE, 100, 50) {
             override fun onAdjustVolume(direction: Int) {
@@ -71,7 +76,11 @@ class SteeringWheelController(
                         PlaybackState.ACTION_SKIP_TO_NEXT or
                         PlaybackState.ACTION_SKIP_TO_PREVIOUS,
                 )
-                .setState(PlaybackState.STATE_PAUSED, 0L, 1f)
+                // A paused session is often ignored by head units while another
+                // source (for example radio) is playing. PLAYING keeps this
+                // session eligible for steering-wheel transport buttons; this
+                // application does not produce audio itself.
+                .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
                 .build(),
         )
         setCallback(
@@ -181,7 +190,27 @@ class SteeringWheelController(
 
     private fun dispatchDefaultMediaCommand(command: SteeringCommand) {
         if (isActive && _pendingCommand.value == null) {
-            emitDebounced(command, command.ordinal)
+            val previous = pendingMediaClick
+            if (previous != null && previous.command == command) {
+                mainHandler.removeCallbacks(previous.runnable)
+                pendingMediaClick = null
+                val doubleCommand = doubleCommand(command)
+                if (doubleCommand != null && _mappings.value.containsKey(doubleCommand)) {
+                    emitDebounced(doubleCommand, command.ordinal)
+                } else {
+                    emitDebounced(command, command.ordinal)
+                }
+            } else {
+                pendingMediaClick?.let { mainHandler.removeCallbacks(it.runnable) }
+                val runnable = Runnable {
+                    if (pendingMediaClick?.command == command) {
+                        pendingMediaClick = null
+                        emitDebounced(command, command.ordinal)
+                    }
+                }
+                pendingMediaClick = PendingMediaClick(command, runnable)
+                mainHandler.postDelayed(runnable, DOUBLE_CLICK_TIMEOUT_MILLIS)
+            }
         }
     }
 
